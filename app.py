@@ -1,30 +1,117 @@
 import streamlit as st
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.image import img_to_array
 import numpy as np
+from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing import image
 from PIL import Image
 
-# Load your model
-model = load_model('fruit_ripeness_model.h5')
+# -------------------------------
+# Page Config
+# -------------------------------
+st.set_page_config(
+    page_title="Human Activity Recognition",
+    page_icon="🧠",
+    layout="centered"
+)
 
-# Define your class labels
-class_names = ['Raw', 'Ripe']
+# -------------------------------
+# Title & Description
+# -------------------------------
+st.title("🧠 Human Activity Recognition App")
+st.write("Upload an image to detect the human activity from 15 classes.")
 
-st.title("🍎 Fruit Ripeness Detector")
-st.write("Upload a fruit image to check if it's ripe or raw.")
+# -------------------------------
+# Load Model (Cached)
+# -------------------------------
+@st.cache_resource
+def load_model_cached():
+    model = load_model("har_model.h5")
+    return model
 
-uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "png", "jpeg"])
+model = load_model_cached()
 
+# -------------------------------
+# Class Labels
+# -------------------------------
+class_names = [
+    'sitting',
+    'using_laptop',
+    'hugging',
+    'sleeping',
+    'drinking',
+    'clapping',
+    'dancing',
+    'cycling',
+    'calling',
+    'laughing',
+    'eating',
+    'fighting',
+    'listening_to_music',
+    'running',
+    'texting'
+]
+
+# -------------------------------
+# Sidebar Info
+# -------------------------------
+st.sidebar.title("ℹ️ About")
+st.sidebar.info(
+    "This app uses a Deep Learning model to classify human activities from images.\n\n"
+    "Classes: 15 Activities"
+)
+
+# -------------------------------
+# File Upload
+# -------------------------------
+uploaded_file = st.file_uploader(
+    "📤 Upload an activity image",
+    type=["jpg", "jpeg", "png"]
+)
+
+# -------------------------------
+# Prediction Section
+# -------------------------------
 if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption='Uploaded Image', use_column_width=True)
+    # Show uploaded image
+    img = Image.open(uploaded_file).convert("RGB")
+    st.image(img, caption='Uploaded Image', use_column_width=True)
 
-    img = image.resize((128, 128))  # Match your model's input size
-    img = img_to_array(img)
-    img = img / 255.0
-    img = np.expand_dims(img, axis=0)
+    # Preprocessing
+    img_resized = img.resize((224, 224))  # must match training size
+    img_array = image.img_to_array(img_resized)
+    img_array = img_array / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
 
-    prediction = model.predict(img)
-    predicted_class = class_names[np.argmax(prediction)]
+    # Prediction
+    with st.spinner("🔍 Analyzing image..."):
+        prediction = model.predict(img_array)
 
-    st.success(f"🍌 Prediction: **{predicted_class}**")
+    predicted_index = np.argmax(prediction)
+    predicted_class = class_names[predicted_index]
+    confidence = np.max(prediction)
+
+    # -------------------------------
+    # Result Display
+    # -------------------------------
+    st.success(f"✅ Prediction: **{predicted_class}**")
+    st.info(f"📊 Confidence: **{confidence:.2f}**")
+
+    # Confidence Interpretation
+    if confidence > 0.80:
+        st.success("High confidence prediction ✅")
+    elif confidence > 0.50:
+        st.warning("Moderate confidence ⚠️")
+    else:
+        st.error("Low confidence ❌")
+
+    # -------------------------------
+    # Show All Probabilities
+    # -------------------------------
+    st.subheader("📊 Class Probabilities")
+    for i, prob in enumerate(prediction[0]):
+        st.write(f"{class_names[i]}: {prob:.2f}")
+
+# -------------------------------
+# Footer
+# -------------------------------
+st.markdown("---")
+st.markdown("👩‍💻 Developed for Human Activity Recognition Project")
